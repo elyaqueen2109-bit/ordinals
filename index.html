@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ordinal Cat — Catch Them All!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800;12..96,900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;
+    background: #0a0415;
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
+    user-select: none;
+  }
+  .game {
+    position: relative;
+    width: 100%; max-width: 600px;
+    height: 100vh; max-height: 950px;
+    background: radial-gradient(ellipse at top, #3a1a5a 0%, #1a0a2a 60%, #0a0515 100%);
+    overflow: hidden;
+    box-shadow: 0 0 100px rgba(180, 80, 255, 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 600px) {
+    .game { border-radius: 32px; height: 96vh; }
+  }
+
+  .bg-pattern {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(255,180,80,0.08), transparent 25%),
+      radial-gradient(circle at 80% 70%, rgba(180,80,255,0.1), transparent 30%),
+      radial-gradient(2px 2px at 50px 100px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 150px 200px, #ffd86b, transparent),
+      radial-gradient(1px 1px at 250px 80px, #fff, transparent),
+      radial-gradient(2px 2px at 350px 250px, #b9a9ff, transparent),
+      radial-gradient(1.5px 1.5px at 450px 150px, #fff, transparent);
+    background-size: 500px 400px;
+    background-repeat: repeat;
+    animation: bgFloat 8s ease-in-out infinite alternate;
+    pointer-events: none;
+    opacity: 0.9;
+  }
+  @keyframes bgFloat {
+    from { background-position: 0 0; }
+    to { background-position: 20px 40px; }
+  }
+
+  /* ============================================
+     ЛАПКИ НА САМОМ ЗАДНЕМ ФОНЕ
+     Огромные, медленно плывущие, еле заметные
+     ============================================ */
+  .paw-bg {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.06;
+    z-index: 0;
+    color: #ffd86b;
+    animation: pawBgDrift linear infinite;
+  }
+  @keyframes pawBgDrift {
+    0% { transform: translateY(110vh) rotate(0deg); }
+    100% { transform: translateY(-300px) rotate(180deg); }
+  }
+
+  /* Лапки в среднем слое — чуть заметнее */
+  .paw-float {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.1;
+    z-index: 1;
+    animation: pawDrift 20s linear infinite;
+    color: #ffd86b;
+  }
+  @keyframes pawDrift {
+    0% { transform: translateY(100vh) rotate(0); opacity: 0; }
+    10% { opacity: 0.14; }
+    90% { opacity: 0.14; }
+    100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+  }
+
+  .hud {
+    position: relative;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px;
+    z-index: 10;
+    color: #fff; font-weight: 700; font-size: 15px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .hud > div {
+    background: rgba(30, 15, 60, 0.85);
+    border: 2px solid rgba(255, 200, 107, 0.5);
+    padding: 8px 16px; border-radius: 20px;
+    text-shadow: 0 0 10px rgba(255,200,107,0.9);
+    display: flex; align-items: center; gap: 8px;
+    backdrop-filter: blur(10px);
+    font-weight: 700;
+  }
+  .hud .streak {
+    color: #ffd86b;
+  }
+  .hud .streak.fire { animation: fireGlow 0.5s infinite alternate; }
+  @keyframes fireGlow {
+    from { text-shadow: 0 0 12px #ffb800; }
+    to { text-shadow: 0 0 20px #ff6b00, 0 0 30px #ff2b5e; }
+  }
+  .lives .heart {
+    display: inline-block; margin: 0 1px;
+    color: #ff3b6b; text-shadow: 0 0 8px #ff3b6b;
+    transition: all 0.3s;
+    font-size: 18px;
+  }
+  .lives .heart.lost { color: #3a3a4a; text-shadow: none; transform: scale(0.8); }
+  .lives .heart.hit { animation: heartHit 0.5s; }
+  @keyframes heartHit {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.6) rotate(15deg); }
+  }
+
+  .stage {
+    flex: 1;
+    position: relative;
+    margin: 0 14px;
+    background: linear-gradient(180deg, rgba(60, 30, 100, 0.4), rgba(20, 10, 40, 0.6));
+    border: 3px solid rgba(255, 200, 107, 0.35);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: inset 0 0 80px rgba(180,80,255,0.3);
+    z-index: 2;
+  }
+  .floor {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 30%;
+    background: linear-gradient(180deg, rgba(120,60,180,0.3) 0%, rgba(60,20,100,0.6) 100%);
+    border-top: 2px solid rgba(255,200,107,0.3);
+    box-shadow: inset 0 20px 40px rgba(0,0,0,0.4);
+  }
+
+  /* ============================================
+     КОТ — базовый размер 280px
+     Отдельные коты будут больше (задаётся в JS)
+     ============================================ */
+  .cat {
+    position: absolute;
+    width: 280px; height: 280px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    z-index: 5;
+    animation: catSpawn 0.4s cubic-bezier(0.5, 1.6, 0.5, 1);
+    will-change: transform, left, top;
+  }
+  @keyframes catSpawn {
+    0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+    70% { transform: scale(1.15) rotate(10deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+  }
+  .cat svg, .cat img { width: 100%; height: 100%; overflow: visible; display: block; }
+  .cat img { object-fit: contain; pointer-events: none; }
+  .cat.caught {
+    animation: catCaught 0.6s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes catCaught {
+    0% { transform: scale(1) rotate(0); opacity: 1; }
+    40% { transform: scale(1.3) rotate(-15deg); opacity: 1; filter: brightness(2); }
+    100% { transform: scale(0) rotate(180deg); opacity: 0; }
+  }
+  .cat.escaped {
+    animation: catEscaped 0.8s ease-in forwards;
+  }
+  @keyframes catEscaped {
+    0% { transform: translateX(0) rotate(0); opacity: 1; }
+    100% { transform: translateX(350px) rotate(30deg); opacity: 0; }
+  }
+  .cat.judging {
+    animation: catJudging 0.8s ease-in-out;
+  }
+  @keyframes catJudging {
+    0%,100% { transform: rotate(0); }
+    25% { transform: rotate(-8deg); }
+    75% { transform: rotate(8deg); }
+  }
+
+  .cat-number {
+    position: absolute;
+    top: 55%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 52px; font-weight: 900;
+    font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+    color: #fff;
+    text-shadow: 0 0 15px #ff2b5e, 0 0 30px #ffb800, 3px 3px 0 #900;
+    pointer-events: none;
+    z-index: 3;
+    letter-spacing: 1px;
+  }
+
+  .cat-bubble {
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%) scale(0);
+    padding: 10px 16px;
+    background: #fff;
+    border: 3px solid #1a0a2a;
+    border-radius: 20px;
+    color: #1a0a2a;
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 5px 0 rgba(0,0,0,0.3);
+    transition: transform 0.3s;
+    font-family: 'Space Grotesk', sans-serif;
+    max-width: 240px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+  .cat-bubble.show { transform: translateX(-50%) scale(1); }
+  .cat-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #1a0a2a;
+  }
+  .cat-bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -6px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #fff;
+    z-index: 1;
+  }
+
+  .cat-timer {
+    position: absolute;
+    bottom: -8px; left: 10%; right: 10%;
+    height: 8px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 4px;
+    overflow: hidden;
+    z-index: 6;
+  }
+  .cat-timer .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4ef0ff, #ffd86b, #ff2b5e);
+    border-radius: 4px;
+    transform-origin: left center;
+    animation: timerTick linear forwards;
+  }
+  @keyframes timerTick {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+
+  .input-panel {
+    padding: 16px 18px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    z-index: 10;
+    position: relative;
+  }
+  .input-panel input {
+    flex: 1;
+    padding: 18px 20px;
+    font-size: 20px; font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    color: #fff;
+    background: rgba(30, 15, 60, 0.9);
+    border: 3px solid #ffd86b;
+    border-radius: 18px;
+    outline: none;
+    text-align: center;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    text-transform: lowercase;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.5), 0 0 20px rgba(255,200,107,0.3);
+    min-width: 0;
+  }
+  .input-panel input::placeholder {
+    color: #8a7aaa; letter-spacing: 0.5px; font-weight: 500;
+    text-transform: none;
+  }
+  .input-panel input:focus {
+    border-color: #ff6b00;
+    box-shadow: 0 0 30px rgba(255,107,0,0.7), inset 0 2px 10px rgba(0,0,0,0.5);
+  }
+  .input-panel input.correct {
+    border-color: #1de07a;
+    background: rgba(29,224,122,0.15);
+    box-shadow: 0 0 30px rgba(29,224,122,0.8);
+  }
+  .input-panel input.wrong {
+    border-color: #ff2b5e;
+    background: rgba(255,43,94,0.15);
+    box-shadow: 0 0 30px rgba(255,43,94,0.8);
+    animation: inputShake 0.4s;
+  }
+  @keyframes inputShake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+  .input-panel button {
+    padding: 18px 26px;
+    font-size: 18px; font-weight: 800;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    color: #fff;
+    background: linear-gradient(135deg, #ff6b00, #ff2b5e);
+    border: 3px solid #ffd86b;
+    border-radius: 18px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #900, 0 0 20px rgba(255,43,94,0.6);
+    transition: all 0.1s;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .input-panel button:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #900, 0 0 30px rgba(255,43,94,0.9); }
+  .input-panel button:active { transform: translateY(2px); box-shadow: 0 3px 0 #900; }
+  .input-panel button:disabled { opacity: 0.4; cursor: default; transform: translateY(2px); box-shadow: 0 3px 0 #900; }
+
+  .toast {
+    position: absolute;
+    top: 38%; left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 18px 36px;
+    border-radius: 24px;
+    font-size: 26px; font-weight: 800;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    color: #fff;
+    pointer-events: none;
+    z-index: 30;
+    text-align: center;
+    animation: toastAnim 1s ease-out forwards;
+    white-space: nowrap;
+    border: 4px solid #fff;
+  }
+  .toast.ok {
+    background: linear-gradient(135deg, #1de07a, #0fa85a);
+    box-shadow: 0 0 60px rgba(29,224,122,0.9);
+    text-shadow: 0 0 20px #fff;
+  }
+  .toast.super {
+    background: linear-gradient(135deg, #ffd86b, #ff6b00);
+    box-shadow: 0 0 60px rgba(255,215,107,0.9);
+    text-shadow: 0 0 20px #fff;
+    font-size: 30px;
+  }
+  .toast.no {
+    background: linear-gradient(135deg, #ff2b5e, #c40035);
+    box-shadow: 0 0 60px rgba(255,43,94,0.9);
+    text-shadow: 0 0 20px #fff;
+  }
+  .toast .small { display: block; font-size: 14px; font-weight: 600; margin-top: 4px; opacity: 0.95; }
+  @keyframes toastAnim {
+    0% { transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); opacity: 0; }
+    20% { transform: translate(-50%, -50%) scale(1.2) rotate(3deg); opacity: 1; }
+    80% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.9) rotate(0); opacity: 0; }
+  }
+
+  .emoji-burst {
+    position: absolute;
+    font-size: 32px;
+    pointer-events: none;
+    z-index: 25;
+    animation: emojiBurst 1s ease-out forwards;
+  }
+  @keyframes emojiBurst {
+    0% { transform: scale(0) rotate(0); opacity: 1; }
+    50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+    100% { transform: scale(0.5) rotate(360deg) translateY(80px); opacity: 0; }
+  }
+
+  .flash {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 15;
+    animation: flashOut 0.5s ease-out forwards;
+  }
+  .flash.green { background: radial-gradient(circle, rgba(29,224,122,0.5), transparent 70%); }
+  .flash.red { background: radial-gradient(circle, rgba(255,43,94,0.6), transparent 70%); }
+  .flash.gold { background: radial-gradient(circle, rgba(255,215,107,0.6), transparent 70%); }
+  @keyframes flashOut { from { opacity: 1; } to { opacity: 0; } }
+
+  .collection-btn {
+    position: absolute;
+    top: 65px; right: 16px;
+    background: rgba(30, 15, 60, 0.85);
+    border: 2px solid rgba(255, 200, 107, 0.6);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 22px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 20;
+    transition: all 0.2s;
+    font-family: 'Space Grotesk', sans-serif;
+    display: flex; align-items: center; gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .collection-btn:hover { background: rgba(255, 107, 0, 0.4); transform: scale(1.05); }
+  .collection-btn .badge {
+    background: #ff2b5e;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    min-width: 20px;
+    text-align: center;
+    font-weight: 800;
+  }
+
+  .collection-modal {
+    position: absolute; inset: 0;
+    background: rgba(10, 5, 25, 0.96);
+    z-index: 35;
+    display: none;
+    flex-direction: column;
+    padding: 24px;
+    animation: fadeIn 0.3s;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .collection-modal.show { display: flex; }
+  .collection-modal h2 {
+    color: #ffd86b; text-align: center; margin-bottom: 18px;
+    font-size: 26px;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .collection-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    overflow-y: auto;
+    padding: 6px;
+    max-height: 100%;
+  }
+  @media (min-width: 480px) {
+    .collection-grid { grid-template-columns: repeat(5, 1fr); }
+  }
+  .collection-item {
+    background: rgba(30, 15, 60, 0.7);
+    border: 2px solid rgba(255, 200, 107, 0.25);
+    border-radius: 14px;
+    aspect-ratio: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    font-size: 34px;
+    transition: all 0.3s;
+    overflow: hidden;
+  }
+  .collection-item.caught {
+    border-color: #ffd86b;
+    box-shadow: 0 0 15px rgba(255,200,107,0.6);
+    background: rgba(255, 200, 107, 0.1);
+  }
+  .collection-item.caught:hover { transform: scale(1.1); }
+  .collection-item.locked {
+    color: #444;
+    font-size: 24px;
+  }
+  .collection-item .num-badge {
+    position: absolute;
+    top: 5px; left: 7px;
+    font-size: 11px;
+    color: #ffd86b;
+    font-weight: 800;
+    opacity: 0.75;
+    z-index: 2;
+    font-family: 'Bricolage Grotesque', sans-serif;
+  }
+  .collection-item img {
+    width: 80%; height: 80%;
+    object-fit: contain;
+  }
+  .collection-modal .close-btn {
+    margin-top: 16px;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #ff6b00, #ff2b5e);
+    border: 3px solid #ffd86b;
+    border-radius: 18px;
+    color: #fff;
+    font-size: 15px; font-weight: 800;
+    cursor: pointer;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    box-shadow: 0 5px 0 #900;
+    align-self: center;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .collection-modal .close-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #900; }
+
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: radial-gradient(ellipse at top, rgba(80,30,140,0.98) 0%, rgba(30,10,60,0.99) 40%, rgba(10,5,25,1) 100%);
+    z-index: 40; text-align: center; padding: 30px 22px 140px;
+    animation: fadeIn 0.4s;
+    font-family: 'Space Grotesk', sans-serif;
+    overflow-y: auto;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .overlay::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(2px 2px at 50px 80px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 150px 150px, #ffd86b, transparent),
+      radial-gradient(1px 1px at 250px 60px, #fff, transparent),
+      radial-gradient(2px 2px at 380px 200px, #b9a9ff, transparent),
+      radial-gradient(1.5px 1.5px at 480px 100px, #fff, transparent),
+      radial-gradient(1px 1px at 550px 250px, #4ef0ff, transparent),
+      radial-gradient(2px 2px at 90px 280px, #fff, transparent);
+    background-size: 600px 400px;
+    pointer-events: none;
+    animation: starTwinkle 3s ease-in-out infinite alternate;
+    opacity: 0.6;
+  }
+  @keyframes starTwinkle {
+    from { opacity: 0.4; }
+    to { opacity: 0.8; }
+  }
+
+  .game-title {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 10px;
+    margin-top: 30px;
+    animation: titleFloat 3s ease-in-out infinite;
+  }
+  @keyframes titleFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  .game-title h1 {
+    font-size: 58px; color: #fff; margin: 0;
+    text-shadow:
+      0 0 10px #ffd86b,
+      0 0 25px #ff6b00,
+      0 0 50px #ff2b5e,
+      5px 5px 0 #900;
+    line-height: 1;
+    font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .game-title .subtitle {
+    color: #ffd86b;
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 12px;
+    text-shadow: 0 0 15px #ffb800;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .cat-parade {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    max-width: 480px;
+    width: 100%;
+    margin: 26px 0 22px;
+    padding: 18px;
+    background: rgba(30, 15, 60, 0.6);
+    border: 3px solid rgba(255, 200, 107, 0.4);
+    border-radius: 28px;
+    box-shadow: 0 0 40px rgba(255, 150, 50, 0.4), inset 0 0 30px rgba(180,80,255,0.2);
+    backdrop-filter: blur(10px);
+  }
+  .cat-parade .cover-cat {
+    aspect-ratio: 1;
+    background: radial-gradient(circle at 50% 30%, rgba(255,200,107,0.15), rgba(60,30,100,0.4));
+    border: 2px solid rgba(255, 200, 107, 0.3);
+    border-radius: 18px;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+    transition: all 0.3s;
+    animation: coverCatFloat 3s ease-in-out infinite;
+    position: relative;
+  }
+  .cat-parade .cover-cat:nth-child(odd) { animation-delay: 0.3s; }
+  .cat-parade .cover-cat:nth-child(3n) { animation-delay: 0.6s; }
+  @keyframes coverCatFloat {
+    0%,100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-8px) rotate(2deg); }
+  }
+  .cat-parade .cover-cat:hover {
+    transform: scale(1.1) rotate(-3deg);
+    border-color: #ffd86b;
+    box-shadow: 0 0 25px rgba(255,200,107,0.8);
+  }
+  .cat-parade .cover-cat img {
+    width: 94%; height: 94%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+  }
+  .cat-parade .cover-cat .placeholder {
+    font-size: 14px;
+    color: #8a7aaa;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .how-to-play {
+    position: relative;
+    z-index: 2;
+    background: rgba(255,200,107,0.08);
+    border: 2px solid rgba(255,200,107,0.4);
+    border-radius: 24px;
+    padding: 22px 26px;
+    margin: 0 0 20px;
+    text-align: left;
+    font-size: 15px;
+    color: #ffe0b0;
+    line-height: 1.9;
+    max-width: 480px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+  }
+  .how-to-play .rule-title {
+    color: #ffd86b;
+    font-size: 20px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 16px;
+    letter-spacing: 3px;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    text-transform: uppercase;
+    text-shadow: 0 0 15px #ffb800;
+  }
+  .how-to-play .rule-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .how-to-play .rule-row .marker {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    background: rgba(255,200,107,0.2);
+    border: 2px solid rgba(255,200,107,0.5);
+    border-radius: 8px;
+    display: flex;
+    justify-content: center; align-items: center;
+    font-weight: 800;
+    color: #ffd86b;
+    font-size: 13px;
+  }
+  .how-to-play .rule-row b { color: #ffd86b; font-weight: 700; }
+  .how-to-play code {
+    background: rgba(255,200,107,0.2);
+    padding: 2px 8px; border-radius: 6px;
+    color: #ffd86b; font-family: 'Space Grotesk', monospace; font-weight: 700;
+    font-size: 13px;
+  }
+
+  /* ============================================
+     ПЛАВАЮЩИЕ КНОПКИ
+     ============================================ */
+  .float-btn {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 22px 68px;
+    font-size: 24px;
+    font-weight: 800;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    color: #fff;
+    background: linear-gradient(135deg, #ff6b00, #ff2b5e);
+    border: 4px solid #ffd86b;
+    border-radius: 999px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    box-shadow:
+      0 10px 0 #900,
+      0 0 40px rgba(255, 107, 0, 0.8),
+      0 0 80px rgba(255, 43, 94, 0.5);
+    transition: all 0.15s;
+    z-index: 50;
+    animation: btnFloat 2.2s ease-in-out infinite;
+    display: none;
+  }
+  @keyframes btnFloat {
+    0%,100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-10px); }
+  }
+  .float-btn.visible { display: block; }
+  .float-btn:hover {
+    transform: translateX(-50%) translateY(-4px) scale(1.05);
+    box-shadow:
+      0 12px 0 #900,
+      0 0 60px rgba(255, 107, 0, 1),
+      0 0 100px rgba(255, 43, 94, 0.8);
+  }
+  .float-btn:active {
+    transform: translateX(-50%) translateY(6px) scale(1);
+    box-shadow:
+      0 4px 0 #900,
+      0 0 30px rgba(255, 107, 0, 0.6);
+  }
+
+  .mute-btn {
+    position: absolute; top: 16px; right: 16px;
+    background: rgba(30, 15, 60, 0.85);
+    border: 2px solid rgba(255,200,107,0.5);
+    color: #fff; width: 42px; height: 42px;
+    border-radius: 50%; cursor: pointer; font-size: 13px;
+    z-index: 50; transition: all 0.2s;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800;
+  }
+  .mute-btn:hover { background: rgba(255,107,0,0.5); transform: scale(1.1); }
+
+  .final-cats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    max-width: 440px;
+    margin: 12px 0;
+  }
+  .final-cats .fc {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: rgba(30, 15, 60, 0.7);
+    border: 2px solid rgba(255, 200, 107, 0.4);
+    display: flex; justify-content: center; align-items: center;
+    font-size: 26px;
+    overflow: hidden;
+    animation: flagPop 0.5s ease-out backwards;
+  }
+  .final-cats .fc.locked { color: #444; font-size: 20px; border-color: rgba(100,100,100,0.3); }
+  .final-cats .fc img { width: 90%; height: 90%; object-fit: contain; }
+  @keyframes flagPop {
+    0% { transform: scale(0) rotate(-180deg); }
+    70% { transform: scale(1.3) rotate(10deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  .collection-progress {
+    color: #b9a9ff;
+    font-size: 14px;
+    margin: 8px 0;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="game" id="game">
+  <div class="bg-pattern"></div>
+
+  <!-- Лапки на самом заднем фоне -->
+  <div id="pawBgLayer" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;"></div>
+
+  <!-- Лапки в среднем слое -->
+  <div id="pawLayer" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1;"></div>
+
+  <button class="mute-btn" id="muteBtn" title="Sound">ON</button>
+
+  <div class="hud" id="hud" style="visibility:hidden;">
+    <div>Score <span id="scoreVal">0</span></div>
+    <div class="streak" id="streakBox">Streak <span id="streakVal">0</span></div>
+    <div class="lives" id="livesBox"></div>
+  </div>
+
+  <button class="collection-btn" id="collectionBtn" style="display:none;">
+    Cats <span class="badge" id="catsCount">0/20</span>
+  </button>
+
+  <div class="stage" id="stage">
+    <div class="floor"></div>
+  </div>
+
+  <div class="input-panel" id="inputPanel" style="display:none;">
+    <input type="text" id="answerInput" placeholder="type here..." autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text">
+    <button id="submitBtn">Go</button>
+  </div>
+
+  <div class="collection-modal" id="collectionModal">
+    <h2>Cat Collection</h2>
+    <div class="collection-grid" id="collectionGrid"></div>
+    <button class="close-btn" onclick="closeCollection()">Close</button>
+  </div>
+
+  <!-- ЭКРАН 1: ТИТУЛЬНИК -->
+  <div class="overlay" id="titleScreen">
+    <div class="game-title">
+      <h1>Ordinal Cat</h1>
+      <div class="subtitle">Catch Them All</div>
+    </div>
+
+    <div class="cat-parade" id="catParade"></div>
+  </div>
+
+  <!-- Кнопка START — без буквы P -->
+  <button class="float-btn visible" id="startBtn" onclick="showRules()">
+    Start
+  </button>
+
+  <!-- ЭКРАН 2: ПРАВИЛА -->
+  <div class="overlay" id="rulesScreen" style="display:none;">
+    <div class="game-title">
+      <h1>How to Play</h1>
+    </div>
+
+    <div class="how-to-play">
+      <div class="rule-row">
+        <div class="marker">1</div>
+        <div>A cat appears with a <b>number on its back</b></div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">2</div>
+        <div>Type the <b>ordinal form</b> in small letters</div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">3</div>
+        <div>Press <b>Enter</b> or <b>Go</b> before the timer runs out</div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">4</div>
+        <div>3 correct answers in a row give you <b>bonus points</b></div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">5</div>
+        <div>A mistake costs <b>1 life</b>. You have 3 lives</div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">6</div>
+        <div>Catch all <b>20 cats</b> to win the game</div>
+      </div>
+      <div class="rule-row">
+        <div class="marker">7</div>
+        <div>Examples: <code>5 &rarr; fifth</code> <code>12 &rarr; twelfth</code> <code>21 &rarr; twenty-first</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кнопка LET'S GO — без буквы P -->
+  <button class="float-btn" id="letsGoBtn" onclick="startGame()" style="display:none;">
+    Let's Go
+  </button>
+
+  <!-- ЭКРАН 3: ФИНАЛ -->
+  <div class="overlay" id="endScreen" style="display:none;"></div>
+
+  <!-- Кнопка PLAY AGAIN — без буквы P -->
+  <button class="float-btn" id="playAgainBtn" onclick="backToTitle()" style="display:none;">
+    Play Again
+  </button>
+</div>
+
+<script>
+/* ============================================================
+   SVG ЛАПКА — используется в фоне
+   ============================================================ */
+const PAW_SVG = `<svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+  <ellipse cx="50" cy="68" rx="22" ry="18"/>
+  <ellipse cx="22" cy="42" rx="9" ry="12"/>
+  <ellipse cx="42" cy="28" rx="9" ry="12"/>
+  <ellipse cx="62" cy="28" rx="9" ry="12"/>
+  <ellipse cx="82" cy="42" rx="9" ry="12"/>
+</svg>`;
+
+/* ============================================================
+   ЗАДНИЙ СЛОЙ: ОГРОМНЫЕ ЛАПКИ — очень медленно, еле видны
+   ============================================================ */
+(function spawnBgPaws() {
+  const layer = document.getElementById('pawBgLayer');
+  if (!layer) return;
+  for (let i = 0; i < 8; i++) {
+    const paw = document.createElement('div');
+    paw.className = 'paw-bg';
+    const size = 180 + Math.random() * 180;   // 180–360 px — ОГРОМНЫЕ
+    paw.style.width = size + 'px';
+    paw.style.height = size + 'px';
+    paw.style.left = (Math.random() * 100) + '%';
+    paw.style.animationDelay = (Math.random() * 30) + 's';
+    paw.style.animationDuration = (35 + Math.random() * 25) + 's';
+    paw.style.color = Math.random() > 0.5 ? '#ffd86b' : '#b9a9ff';
+    paw.innerHTML = PAW_SVG;
+    layer.appendChild(paw);
+  }
+})();
+
+/* ============================================================
+   СРЕДНИЙ СЛОЙ: МАЛЕНЬКИЕ ЛАПКИ — плывут быстрее
+   ============================================================ */
+(function spawnPaws() {
+  const layer = document.getElementById('pawLayer');
+  if (!layer) return;
+  for (let i = 0; i < 12; i++) {
+    const paw = document.createElement('div');
+    paw.className = 'paw-float';
+    const size = 30 + Math.random() * 50;
+    paw.style.width = size + 'px';
+    paw.style.height = size + 'px';
+    paw.style.left = (Math.random() * 100) + '%';
+    paw.style.animationDelay = (Math.random() * 20) + 's';
+    paw.style.animationDuration = (18 + Math.random() * 12) + 's';
+    paw.innerHTML = PAW_SVG;
+    layer.appendChild(paw);
+  }
+})();
+
+/* ============================================================
+   ЧИСЛА
+   ============================================================ */
+const NUMBER_POOL = [
+  { num: 1,   answer: 'first' },          { num: 2,   answer: 'second' },
+  { num: 3,   answer: 'third' },          { num: 4,   answer: 'fourth' },
+  { num: 5,   answer: 'fifth' },          { num: 6,   answer: 'sixth' },
+  { num: 7,   answer: 'seventh' },        { num: 8,   answer: 'eighth' },
+  { num: 9,   answer: 'ninth' },          { num: 10,  answer: 'tenth' },
+  { num: 11,  answer: 'eleventh' },       { num: 12,  answer: 'twelfth' },
+  { num: 13,  answer: 'thirteenth' },     { num: 14,  answer: 'fourteenth' },
+  { num: 15,  answer: 'fifteenth' },      { num: 16,  answer: 'sixteenth' },
+  { num: 17,  answer: 'seventeenth' },    { num: 18,  answer: 'eighteenth' },
+  { num: 19,  answer: 'nineteenth' },     { num: 20,  answer: 'twentieth' },
+  { num: 21,  answer: 'twenty-first' },   { num: 22,  answer: 'twenty-second' },
+  { num: 23,  answer: 'twenty-third' },   { num: 24,  answer: 'twenty-fourth' },
+  { num: 25,  answer: 'twenty-fifth' },   { num: 30,  answer: 'thirtieth' },
+  { num: 31,  answer: 'thirty-first' },   { num: 40,  answer: 'fortieth' },
+  { num: 41,  answer: 'forty-first' },    { num: 50,  answer: 'fiftieth' },
+  { num: 60,  answer: 'sixtieth' },       { num: 70,  answer: 'seventieth' },
+  { num: 80,  answer: 'eightieth' },      { num: 90,  answer: 'ninetieth' },
+  { num: 99,  answer: 'ninety-ninth' },   { num: 100, answer: 'hundredth' },
+];
+
+const CAT_NAMES = [
+  'Whiskers', 'Mittens', 'Shadow', 'Snowball', 'Tiger',
+  'Oreo', 'Ginger', 'Smokey', 'Luna', 'Coco',
+  'Pepper', 'Mochi', 'Bandit', 'Simba', 'Nala',
+  'Ziggy', 'Pumpkin', 'Pearl', 'Lucky', 'Boss Cat'
+];
+
+/* ============================================================
+   РАЗМЕРЫ ДЛЯ КАЖДОЙ КАРТИНКИ
+   cat1.png (белый кот)  — увеличен
+   cat2.png (рыжий кот)  — увеличен ещё больше
+   Остальные — стандартные 280
+   ============================================================ */
+const CAT_SIZES = [
+  360,   // cat1.png — белый кот (увеличен)
+  400,   // cat2.png — рыжий кот (увеличен сильнее)
+  280,   // cat3.png
+  280,   // cat4.png
+  280,   // cat5.png
+  280,   // cat6.png
+  280,   // cat7.png
+  280,   // cat8.png
+];
+
+const CAT_IMAGES = [
+  'cat1.png', 'cat2.png', 'cat3.png', 'cat4.png',
+  'cat5.png', 'cat6.png', 'cat7.png', 'cat8.png',
+];
+
+const availableCatImages = [];
+(function preload() {
+  CAT_IMAGES.forEach((src, i) => {
+    const img = new Image();
+    img.onload = () => {
+      availableCatImages.push({ index: i, src, size: CAT_SIZES[i] || 280 });
+      availableCatImages.sort((a,b) => a.index - b.index);
+      buildCatParade();
+    };
+    img.src = src;
+  });
+})();
+
+function buildCatParade() {
+  const parade = document.getElementById('catParade');
+  if (!parade) return;
+  parade.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cover-cat';
+    const found = availableCatImages.find(c => c.index === i);
+    if (found) {
+      const img = document.createElement('img');
+      img.src = found.src;
+      img.alt = 'cat';
+      // Увеличенные коты (1 и 2) выходят за пределы ячейки
+      if (i === 0) img.style.transform = 'scale(1.25)';
+      if (i === 1) img.style.transform = 'scale(1.4)';
+      cell.appendChild(img);
+    } else {
+      cell.innerHTML = '<span class="placeholder">Cat ' + (i+1) + '</span>';
+    }
+    parade.appendChild(cell);
+  }
+}
+
+/* ============================================================
+   ЗВУК
+   ============================================================ */
+const Sound = (() => {
+  let ctx = null, muted = false;
+  let mewAudio = null;
+
+  function playMew() {
+    if (muted) return;
+    if (!mewAudio) {
+      mewAudio = new Audio('mew.mp3');
+      mewAudio.volume = 0.7;
+    }
+    try {
+      mewAudio.currentTime = 0;
+      const p = mewAudio.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch(e) {}
+  }
+
+  function init() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+  }
+  function tone({freq=440, type='sine', duration=0.15, gain=0.15, freqEnd=null, delay=0}) {
+    if (muted || !ctx) return;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd,1), t0+duration);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(gain, t0+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+duration);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+duration+0.05);
+  }
+  function noise({duration=0.3, gain=0.15, filterFreq=2000}) {
+    if (muted || !ctx) return;
+    const t0 = ctx.currentTime;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(filterFreq, t0);
+    filter.frequency.exponentialRampToValueAtTime(filterFreq * 0.5, t0 + duration);
+    filter.Q.value = 2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    src.connect(filter).connect(g).connect(ctx.destination);
+    src.start(t0);
+  }
+  return {
+    init,
+    toggleMute() { muted = !muted; return muted; },
+    mew() { init(); playMew(); },
+    happyMeow() {
+      init();
+      tone({freq: 600, type:'sine', duration:0.1, gain:0.2, freqEnd: 900});
+      tone({freq: 900, type:'sine', duration:0.12, gain:0.18, freqEnd: 1400, delay: 0.1});
+      tone({freq: 1200, type:'sine', duration:0.18, gain:0.15, freqEnd: 1800, delay: 0.22});
+      setTimeout(() => playMew(), 150);
+    },
+    purr() {
+      init();
+      if (muted || !ctx) return;
+      const t0 = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 22;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.12, t0 + 0.05);
+      g.gain.linearRampToValueAtTime(0, t0 + 0.8);
+      const lfo = ctx.createOscillator();
+      const lfoG = ctx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.value = 25;
+      lfoG.gain.value = 4;
+      lfo.connect(lfoG).connect(osc.frequency);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 200;
+      osc.connect(filter).connect(g).connect(ctx.destination);
+      osc.start(t0);
+      lfo.start(t0);
+      osc.stop(t0 + 0.85);
+      lfo.stop(t0 + 0.85);
+    },
+    angryMeow() {
+      init();
+      tone({freq: 500, type:'sawtooth', duration:0.25, gain:0.2, freqEnd: 250});
+      tone({freq: 350, type:'sawtooth', duration:0.3, gain:0.16, freqEnd: 180, delay: 0.15});
+    },
+    hiss() {
+      init();
+      noise({duration: 0.35, gain: 0.15, filterFreq: 4000});
+    },
+    escape() {
+      init();
+      for (let i = 0; i < 5; i++) {
+        tone({freq: 200 - i * 20, type: 'square', duration: 0.06, gain: 0.08, delay: i * 0.08});
+      }
+      tone({freq: 400, type:'sawtooth', duration: 0.3, gain: 0.12, freqEnd: 100, delay: 0.4});
+    },
+    victory() {
+      init();
+      [523, 659, 784, 1046, 784, 1046, 1318, 1568].forEach((f,i)=>tone({freq:f,type:'triangle',duration:0.18,gain:0.18,delay:i*0.1}));
+    },
+    gameOver() {
+      init();
+      [523, 466, 415, 349, 311, 261].forEach((f,i)=>tone({freq:f,type:'triangle',duration:0.2,gain:0.15,delay:i*0.12}));
+    },
+  };
+})();
+
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
+let score = 0, lives = 3, streak = 0, bestStreak = 0;
+let gameActive = false;
+let acceptInput = false;
+let currentCat = null;
+let currentCatEl = null;
+let escapeTimer = null;
+let caughtCats = new Set();
+let totalCaught = 0;
+let spawnPause = false;
+let currentCats = [];
+
+const $ = id => document.getElementById(id);
+const gameEl = $('game');
+const stageEl = $('stage');
+const inputEl = $('answerInput');
+const submitBtn = $('submitBtn');
+const inputPanel = $('inputPanel');
+
+const MUTE_KEY = 'ordinal_cat_mute';
+$('muteBtn').onclick = () => {
+  const muted = Sound.toggleMute();
+  $('muteBtn').textContent = muted ? 'OFF' : 'ON';
+  localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+};
+if (localStorage.getItem(MUTE_KEY) === '1') {
+  Sound.toggleMute();
+  $('muteBtn').textContent = 'OFF';
+}
+
+/* ============================================================
+   ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
+   ============================================================ */
+window.showRules = function() {
+  Sound.init();
+  $('titleScreen').style.display = 'none';
+  $('startBtn').classList.remove('visible');
+  $('rulesScreen').style.display = 'flex';
+  $('letsGoBtn').style.display = 'block';
+  setTimeout(() => $('letsGoBtn').classList.add('visible'), 50);
+};
+
+window.backToTitle = function() {
+  gameActive = false;
+  acceptInput = false;
+  if (escapeTimer) clearTimeout(escapeTimer);
+  if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+  inputPanel.style.display = 'none';
+  $('hud').style.visibility = 'hidden';
+  $('collectionBtn').style.display = 'none';
+  $('endScreen').style.display = 'none';
+  $('playAgainBtn').classList.remove('visible');
+  $('playAgainBtn').style.display = 'none';
+
+  stageEl.querySelectorAll('.cat').forEach(el => el.remove());
+
+  $('titleScreen').style.display = 'flex';
+  $('startBtn').classList.add('visible');
+  buildCatParade();
+};
+
+window.startGame = function() {
+  Sound.init();
+  score = 0; lives = 3; streak = 0; bestStreak = 0;
+  totalCaught = 0;
+  caughtCats = new Set();
+  gameActive = true;
+  currentCats = pickRandomNumbers();
+
+  updateHud();
+  updateCatsCount();
+  $('rulesScreen').style.display = 'none';
+  $('letsGoBtn').style.display = 'none';
+  $('letsGoBtn').classList.remove('visible');
+  $('endScreen').style.display = 'none';
+  $('hud').style.visibility = 'visible';
+  $('inputPanel').style.display = 'flex';
+  $('collectionBtn').style.display = 'flex';
+
+  setTimeout(spawnCat, 500);
+};
+
+function updateHud() {
+  $('scoreVal').textContent = score;
+  $('streakVal').textContent = streak;
+  $('streakBox').classList.toggle('fire', streak >= 3);
+  let hearts = '';
+  for (let i = 0; i < 3; i++) {
+    hearts += `<span class="heart ${i < lives ? '' : 'lost'}">❤</span>`;
+  }
+  $('livesBox').innerHTML = hearts;
+}
+
+function updateCatsCount() {
+  $('catsCount').textContent = `${totalCaught}/${currentCats.length}`;
+}
+
+/* ============================================================
+   СЛУЧАЙНЫЕ ЧИСЛА
+   ============================================================ */
+function pickRandomNumbers() {
+  const pool = [...NUMBER_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picked = pool.slice(0, 20);
+  return picked.map((item, i) => ({
+    num: item.num,
+    answer: item.answer,
+    name: CAT_NAMES[i % CAT_NAMES.length],
+  }));
+}
+
+const CAT_LINES = [
+  'Meow! What number am I?',
+  'Catch me if you can!',
+  'Purrr... write my number!',
+  'Mew! Quick!',
+  'I am hungry! Number?',
+  'Hiss! Write it!',
+  'Mrrrp! What am I?',
+  'Nya! Hurry up!',
+  'Meow-meow! Go!',
+  'Purr-fect if you answer!',
+];
+const CAT_LINES_WRONG = [
+  'Hiss! Wrong!',
+  'You disappoint me.',
+  'Meow? Seriously?',
+  'I am judging you.',
+  'Nyaaa! Try again!',
+];
+
+/* ============================================================
+   SVG-КОТ — запасной
+   ============================================================ */
+function shadeColor(color, percent) {
+  const num = parseInt(color.replace('#',''), 16);
+  let r = (num >> 16) + percent;
+  let g = ((num >> 8) & 0x00FF) + percent;
+  let b = (num & 0x0000FF) + percent;
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+}
+
+function createCatSVG(seed, color) {
+  const breedType = seed % 4;
+  let ears = '';
+  if (breedType === 3) {
+    ears = `
+      <ellipse cx="50" cy="42" rx="18" ry="16" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>
+      <ellipse cx="130" cy="42" rx="18" ry="16" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>`;
+  } else {
+    ears = `
+      <path d="M30 55 L45 20 L68 50 Z" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>
+      <path d="M112 50 L135 20 L150 55 Z" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>`;
+  }
+  const eyeColor = breedType === 3 ? '#4ef0ff' : (breedType === 1 ? '#1de07a' : '#ffd86b');
+  return `
+    <svg viewBox="0 0 180 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="cb${seed}" cx="0.4" cy="0.3" r="0.8">
+          <stop offset="0%" stop-color="${color}"/>
+          <stop offset="100%" stop-color="${shadeColor(color, -30)}"/>
+        </radialGradient>
+      </defs>
+      <path d="M150 130 Q175 140 170 165 Q165 175 155 170 Q160 155 145 148"
+            fill="${color}" stroke="#1a0a2a" stroke-width="2.5" stroke-linejoin="round"/>
+      <ellipse cx="90" cy="140" rx="58" ry="45" fill="url(#cb${seed})" stroke="#1a0a2a" stroke-width="2.5"/>
+      <ellipse cx="62" cy="180" rx="14" ry="9" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>
+      <ellipse cx="118" cy="180" rx="14" ry="9" fill="${color}" stroke="#1a0a2a" stroke-width="2"/>
+      <ellipse cx="90" cy="80" rx="55" ry="50" fill="url(#cb${seed})" stroke="#1a0a2a" stroke-width="2.5"/>
+      ${ears}
+      <ellipse cx="90" cy="95" rx="30" ry="22" fill="${shadeColor(color, 40)}" opacity="0.6"/>
+      <ellipse cx="72" cy="78" rx="9" ry="11" fill="#fff" stroke="#1a0a2a" stroke-width="2"/>
+      <ellipse cx="108" cy="78" rx="9" ry="11" fill="#fff" stroke="#1a0a2a" stroke-width="2"/>
+      <ellipse cx="74" cy="79" rx="5" ry="7" fill="${eyeColor}"/>
+      <ellipse cx="106" cy="79" rx="5" ry="7" fill="${eyeColor}"/>
+      <ellipse cx="74" cy="79" rx="2.5" ry="6" fill="#1a0a2a"/>
+      <ellipse cx="106" cy="79" rx="2.5" ry="6" fill="#1a0a2a"/>
+      <circle cx="72" cy="76" r="1.8" fill="#fff"/>
+      <circle cx="104" cy="76" r="1.8" fill="#fff"/>
+      <path d="M86 95 L90 100 L94 95 Z" fill="#ff8aaa" stroke="#1a0a2a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M90 100 Q85 106 78 103" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M90 100 Q95 106 102 103" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+  `;
+}
+
+/* ============================================================
+   СПАВН КОТА — с индивидуальным размером
+   ============================================================ */
+function spawnCat() {
+  if (!gameActive) return;
+  if (spawnPause) return;
+  spawnPause = true;
+
+  if (currentCatEl) {
+    currentCatEl.remove();
+    currentCatEl = null;
+  }
+
+  const remaining = currentCats.filter(c => !caughtCats.has(c.num));
+  const pool = remaining.length > 0 ? remaining : currentCats;
+  currentCat = pool[Math.floor(Math.random() * pool.length)];
+
+  const el = document.createElement('div');
+  el.className = 'cat';
+
+  // Выбираем картинку и её размер
+  const catIndex = (currentCat.num * 3) % Math.max(1, availableCatImages.length);
+  const catData = availableCatImages.length > 0 ? availableCatImages[catIndex] : null;
+  const catSize = catData ? catData.size : 280;   // увеличенные коты 1 и 2
+
+  el.style.width = catSize + 'px';
+  el.style.height = catSize + 'px';
+
+  const stageRect = stageEl.getBoundingClientRect();
+  const maxX = Math.max(0, stageRect.width - catSize);
+  const maxY = Math.max(0, stageRect.height - catSize - 40);
+  el.style.left = (Math.random() * maxX) + 'px';
+  el.style.top = (Math.random() * maxY) + 'px';
+
+  const seed = currentCat.num * 7 + 13;
+  const palette = ['#ffb066','#888','#3a2a5a','#f0f0f0','#e8a04a','#2a2a3a','#ff8a3a','#4ef0ff','#d89a4a','#b9a9ff'];
+  const color = palette[seed % palette.length];
+
+  const catImgSrc = catData ? catData.src : null;
+
+  const imgHTML = catImgSrc
+    ? `<img src="${catImgSrc}" alt="cat" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">${createCatSVG(seed, color)}`
+    : createCatSVG(seed, color);
+
+  el.innerHTML = imgHTML +
+    `<div class="cat-number">${currentCat.num}</div>
+     <div class="cat-bubble">${CAT_LINES[Math.floor(Math.random() * CAT_LINES.length)]}</div>`;
+
+  if (catImgSrc) {
+    const svg = el.querySelector('svg');
+    if (svg) svg.style.display = 'none';
+  }
+
+  stageEl.appendChild(el);
+  currentCatEl = el;
+
+  const bubble = el.querySelector('.cat-bubble');
+  setTimeout(() => bubble.classList.add('show'), 200);
+  setTimeout(() => bubble.classList.remove('show'), 2400);
+
+  Sound.mew();
+  setTimeout(() => Sound.purr(), 600);
+
+  el.addEventListener('click', () => {
+    if (!acceptInput) return;
+    inputEl.focus();
+    Sound.mew();
+  });
+
+  const answerLen = currentCat.answer.length;
+  const time = Math.min(22, Math.max(12, 10 + answerLen * 0.9));
+
+  const timerBar = document.createElement('div');
+  timerBar.className = 'cat-timer';
+  timerBar.innerHTML = `<div class="fill" style="animation-duration:${time}s"></div>`;
+  el.appendChild(timerBar);
+
+  escapeTimer = setTimeout(() => {
+    if (acceptInput) handleEscape();
+  }, time * 1000);
+
+  acceptInput = true;
+  inputEl.value = '';
+  inputEl.disabled = false;
+  inputEl.classList.remove('correct', 'wrong');
+  submitBtn.disabled = false;
+  inputEl.focus();
+
+  spawnPause = false;
+}
+
+/* ============================================================
+   ПОБЕГ
+   ============================================================ */
+function handleEscape() {
+  if (!acceptInput) return;
+  acceptInput = false;
+  clearTimeout(escapeTimer);
+  inputEl.disabled = true;
+  submitBtn.disabled = true;
+
+  Sound.escape();
+  setTimeout(() => Sound.hiss(), 200);
+
+  if (currentCatEl) {
+    currentCatEl.classList.add('escaped');
+    setTimeout(() => {
+      if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+    }, 800);
+  }
+
+  showToast(`Cat escaped!`, 'no', `${currentCat.num} — ${currentCat.answer}`);
+  showFlash('red');
+  shakeStage();
+  loseLife();
+
+  if (lives <= 0) {
+    setTimeout(() => endGame(false), 1200);
+  } else {
+    setTimeout(() => {
+      if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+      spawnCat();
+    }, 1400);
+  }
+}
+
+/* ============================================================
+   ПРОВЕРКА
+   ============================================================ */
+function normalize(str) {
+  return str.trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
+}
+function isCorrect(input, expected) {
+  return normalize(input) === normalize(expected);
+}
+
+function submitAnswer() {
+  if (!acceptInput || !currentCat) return;
+  const val = inputEl.value;
+  if (!val.trim()) return;
+
+  acceptInput = false;
+  clearTimeout(escapeTimer);
+  inputEl.disabled = true;
+  submitBtn.disabled = true;
+
+  if (isCorrect(val, currentCat.answer)) {
+    const fill = currentCatEl.querySelector('.cat-timer .fill');
+    const matrix = getComputedStyle(fill).transform;
+    const scaleX = matrix !== 'none' ? parseFloat(matrix.match(/matrix\(([^,]+)/)[1]) : 1;
+
+    let bonus = 10;
+    let kind = 'ok';
+    let toastText = 'Correct! ';
+    let toastSub = `+10 · ${currentCat.name}`;
+
+    if (scaleX > 0.7) {
+      bonus = 30; kind = 'super';
+      toastText = 'Lightning! ';
+      toastSub = `+30 · ${currentCat.name}`;
+    } else if (scaleX > 0.4) {
+      bonus = 20;
+      toastText = 'Fast! ';
+      toastSub = `+20 · ${currentCat.name}`;
+    }
+
+    streak++;
+    if (streak > bestStreak) bestStreak = streak;
+    if (streak >= 3) {
+      bonus += 20;
+      toastText = 'On fire! ';
+      toastSub += ` · streak x${streak} bonus +20`;
+    }
+
+    score += bonus;
+    updateHud();
+    inputEl.classList.add('correct');
+    showToast(`${toastText}${currentCat.answer}!`, kind, toastSub);
+    showFlash(kind === 'super' ? 'gold' : 'green');
+
+    currentCatEl.classList.add('caught');
+    caughtCats.add(currentCat.num);
+    totalCaught = caughtCats.size;
+    updateCatsCount();
+
+    Sound.happyMeow();
+    setTimeout(() => Sound.purr(), 400);
+
+    spawnEmojiBurst(currentCatEl, ['*', '+', 'x', 'o']);
+
+    setTimeout(() => {
+      if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+      if (totalCaught >= currentCats.length) {
+        endGame(true);
+      } else {
+        spawnCat();
+      }
+    }, 900);
+
+  } else {
+    Sound.angryMeow();
+    setTimeout(() => Sound.hiss(), 250);
+    streak = 0;
+    inputEl.classList.add('wrong');
+    showToast(`Wrong! ${currentCat.answer}`, 'no', 'Try again');
+    showFlash('red');
+
+    currentCatEl.classList.add('judging');
+    setTimeout(() => currentCatEl.classList.remove('judging'), 800);
+
+    const bubble = currentCatEl.querySelector('.cat-bubble');
+    bubble.textContent = CAT_LINES_WRONG[Math.floor(Math.random() * CAT_LINES_WRONG.length)];
+    bubble.classList.add('show');
+    setTimeout(() => bubble.classList.remove('show'), 1500);
+
+    loseLife();
+
+    if (lives <= 0) {
+      setTimeout(() => endGame(false), 1200);
+    } else {
+      setTimeout(() => {
+        if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+        spawnCat();
+      }, 1400);
+    }
+  }
+}
+
+/* ============================================================
+   UI ЭФФЕКТЫ
+   ============================================================ */
+function showToast(text, kind, sub) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.innerHTML = text + (sub ? `<span class="small">${sub}</span>` : '');
+  gameEl.appendChild(t);
+  setTimeout(() => t.remove(), 1000);
+}
+function showFlash(kind) {
+  const f = document.createElement('div');
+  f.className = 'flash ' + kind;
+  gameEl.appendChild(f);
+  setTimeout(() => f.remove(), 500);
+}
+function shakeStage() {
+  stageEl.animate(
+    [
+      { transform: 'translateX(0)' },
+      { transform: 'translateX(-10px) rotate(-1deg)' },
+      { transform: 'translateX(10px) rotate(1deg)' },
+      { transform: 'translateX(0)' }
+    ],
+    { duration: 400, easing: 'ease-out' }
+  );
+}
+function spawnEmojiBurst(aroundEl, chars) {
+  const rect = aroundEl.getBoundingClientRect();
+  const stageRect = stageEl.getBoundingClientRect();
+  const cx = rect.left - stageRect.left + rect.width / 2;
+  const cy = rect.top - stageRect.top + rect.height / 2;
+  for (let i = 0; i < 6; i++) {
+    const emoji = document.createElement('div');
+    emoji.className = 'emoji-burst';
+    emoji.textContent = chars[Math.floor(Math.random() * chars.length)];
+    emoji.style.color = '#ffd86b';
+    emoji.style.fontWeight = '900';
+    emoji.style.fontSize = '32px';
+    emoji.style.textShadow = '0 0 20px #ffb800';
+    const angle = (i / 6) * Math.PI * 2;
+    const dist = 60 + Math.random() * 40;
+    emoji.style.left = (cx + Math.cos(angle) * dist) + 'px';
+    emoji.style.top = (cy + Math.sin(angle) * dist) + 'px';
+    stageEl.appendChild(emoji);
+    setTimeout(() => emoji.remove(), 1000);
+  }
+}
+
+function loseLife() {
+  lives--;
+  updateHud();
+  const hearts = document.querySelectorAll('.lives .heart');
+  if (hearts[lives]) hearts[lives].classList.add('hit');
+}
+
+/* ============================================================
+   КОЛЛЕКЦИЯ
+   ============================================================ */
+window.openCollection = function() {
+  const modal = $('collectionModal');
+  const grid = $('collectionGrid');
+  grid.innerHTML = '';
+  currentCats.forEach((cat) => {
+    const el = document.createElement('div');
+    el.className = 'collection-item';
+    if (caughtCats.has(cat.num)) {
+      el.classList.add('caught');
+      const catIndex = (cat.num * 3) % Math.max(1, availableCatImages.length);
+      if (availableCatImages.length > 0) {
+        el.innerHTML = `<span class="num-badge">#${cat.num}</span><img src="${availableCatImages[catIndex].src}" alt="cat">`;
+      } else {
+        el.innerHTML = `<span class="num-badge">#${cat.num}</span>`;
+      }
+      el.title = `${cat.name} — ${cat.answer}`;
+    } else {
+      el.classList.add('locked');
+      el.textContent = '?';
+      el.title = 'Not caught yet';
+    }
+    grid.appendChild(el);
+  });
+  modal.classList.add('show');
+};
+window.closeCollection = function() {
+  $('collectionModal').classList.remove('show');
+};
+$('collectionBtn').onclick = openCollection;
+
+/* ============================================================
+   ФИНАЛ
+   ============================================================ */
+function endGame(won) {
+  gameActive = false;
+  acceptInput = false;
+  clearTimeout(escapeTimer);
+  if (currentCatEl) { currentCatEl.remove(); currentCatEl = null; }
+  inputPanel.style.display = 'none';
+  $('hud').style.visibility = 'hidden';
+  $('collectionBtn').style.display = 'none';
+
+  if (won) Sound.victory(); else Sound.gameOver();
+
+  let title, starsHTML;
+  if (won && score >= 300) { title = 'Cat Master'; starsHTML = '***'; }
+  else if (won) { title = 'All Cats Caught'; starsHTML = '***'; }
+  else if (score >= 150) { title = 'Great Hunter'; starsHTML = '**·'; }
+  else if (score >= 60) { title = 'Nice Try'; starsHTML = '*··'; }
+  else { title = 'Game Over'; starsHTML = '···'; }
+
+  const catsHTML = currentCats.map((cat, i) => {
+    const caught = caughtCats.has(cat.num);
+    const catIndex = (cat.num * 3) % Math.max(1, availableCatImages.length);
+    let inner = '?';
+    if (caught) {
+      if (availableCatImages.length > 0) {
+        inner = `<img src="${availableCatImages[catIndex].src}" alt="cat">`;
+      }
+    }
+    return `<div class="fc ${caught ? '' : 'locked'}" title="${caught ? cat.name : '???'}" style="animation-delay:${i*0.03}s">${inner}</div>`;
+  }).join('');
+
+  const end = $('endScreen');
+  end.style.display = 'flex';
+  end.innerHTML = `
+    <div class="game-title" style="margin-top:20px;">
+      <h1>${title}</h1>
+    </div>
+    <div style="color:#ffd86b;font-size:38px;font-weight:800;margin:16px 0;letter-spacing:8px;text-shadow:0 0 20px #ffb800;font-family:'Bricolage Grotesque',sans-serif;">${starsHTML}</div>
+    <div style="font-size:72px;color:#ffd86b;font-weight:900;text-shadow:0 0 30px #ffb800,0 0 60px #ff6b00;line-height:1;font-family:'Bricolage Grotesque',sans-serif;">${score}</div>
+    <p style="color:#d6c9ff;margin:16px 0 8px;font-size:16px;font-weight:600;">Cats caught: <b style="color:#ffd86b;">${totalCaught} / ${currentCats.length}</b></p>
+    <div class="collection-progress">Best streak: ${bestStreak}</div>
+    <div class="final-cats">${catsHTML}</div>
+    <p style="color:#d6c9ff;margin:16px 0;font-size:15px;font-weight:600;">${won ? 'You are the Cat Whisperer!' : 'The cats escaped...'}</p>
+  `;
+
+  $('playAgainBtn').style.display = 'block';
+  setTimeout(() => $('playAgainBtn').classList.add('visible'), 50);
+}
+
+/* ============================================================
+   УПРАВЛЕНИЕ
+   ============================================================ */
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submitAnswer(); }
+});
+submitBtn.addEventListener('click', submitAnswer);
+
+buildCatParade();
+</script>
+</body>
+</html>
